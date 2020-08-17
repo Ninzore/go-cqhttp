@@ -124,7 +124,13 @@ func (bot *CQBot) CQSendGroupMessage(groupId int64, i interface{}) MSG {
 	// fix at display
 	for _, e := range elem {
 		if at, ok := e.(*message.AtElement); ok && at.Target != 0 {
-			at.Display = "@" + bot.Client.FindGroup(groupId).FindMember(at.Target).DisplayName()
+			at.Display = "@" + func() string {
+				mem := bot.Client.FindGroup(groupId).FindMember(at.Target)
+				if mem != nil {
+					return mem.DisplayName()
+				}
+				return strconv.FormatInt(at.Target, 10)
+			}()
 		}
 	}
 	mid := bot.SendGroupMessage(groupId, &message.SendingMessage{Elements: elem})
@@ -404,12 +410,12 @@ func (bot *CQBot) CQHandleQuickOperation(context, operation gjson.Result) MSG {
 		}
 	case "request":
 		reqType := context.Get("request_type").Str
-		if context.Get("approve").Bool() {
+		if operation.Get("approve").Exists() {
 			if reqType == "friend" {
-				bot.CQProcessFriendRequest(context.Get("flag").Str, true)
+				bot.CQProcessFriendRequest(context.Get("flag").Str, operation.Get("approve").Bool())
 			}
 			if reqType == "group" {
-				bot.CQProcessGroupRequest(context.Get("flag").Str, context.Get("sub_type").Str, true)
+				bot.CQProcessGroupRequest(context.Get("flag").Str, context.Get("sub_type").Str, operation.Get("approve").Bool())
 			}
 		}
 	}
@@ -439,7 +445,7 @@ func (bot *CQBot) CQGetForwardMessage(resId string) MSG {
 	}
 	var r []MSG
 	for _, n := range m.Nodes {
-		checkMedia(n.Message)
+		bot.checkMedia(n.Message)
 		r = append(r, MSG{
 			"sender": MSG{
 				"user_id":  n.SenderId,

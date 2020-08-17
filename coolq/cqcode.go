@@ -75,6 +75,18 @@ func ToArrayMessage(e []message.IMessageElement, code int64, raw ...bool) (r []M
 					"data": map[string]string{"file": o.Name, "url": o.Url},
 				}
 			}
+		case *message.ShortVideoElement:
+			if ur {
+				m = MSG{
+					"type": "video",
+					"data": map[string]string{"file": o.Name},
+				}
+			} else {
+				m = MSG{
+					"type": "video",
+					"data": map[string]string{"file": o.Name, "url": o.Url},
+				}
+			}
 		case *message.ImageElement:
 			if ur {
 				m = MSG{
@@ -118,13 +130,19 @@ func ToStringMessage(e []message.IMessageElement, code int64, raw ...bool) (r st
 			if ur {
 				r += fmt.Sprintf(`[CQ:record,file=%s]`, o.Name)
 			} else {
-				r += fmt.Sprintf(`[CQ:record,file=%s,url=%s]`, o.Name, o.Url)
+				r += fmt.Sprintf(`[CQ:record,file=%s,url=%s]`, o.Name, CQCodeEscapeValue(o.Url))
+			}
+		case *message.ShortVideoElement:
+			if ur {
+				r += fmt.Sprintf(`[CQ:video,file=%s]`, o.Name)
+			} else {
+				r += fmt.Sprintf(`[CQ:video,file=%s,url=%s]`, o.Name, CQCodeEscapeValue(o.Url))
 			}
 		case *message.ImageElement:
 			if ur {
 				r += fmt.Sprintf(`[CQ:image,file=%s]`, o.Filename)
 			} else {
-				r += fmt.Sprintf(`[CQ:image,file=%s,url=%s]`, o.Filename, o.Url)
+				r += fmt.Sprintf(`[CQ:image,file=%s,url=%s]`, o.Filename, CQCodeEscapeValue(o.Url))
 			}
 		}
 	}
@@ -145,7 +163,7 @@ func (bot *CQBot) ConvertStringMessage(m string, group bool) (r []message.IMessa
 		ps := paramReg.FindAllStringSubmatch(code, -1)
 		d := make(map[string]string)
 		for _, p := range ps {
-			d[p[1]] = p[2]
+			d[p[1]] = CQCodeUnescapeValue(p[2])
 		}
 		if t == "reply" && group {
 			if len(r) > 0 {
@@ -399,10 +417,22 @@ func CQCodeEscapeText(raw string) string {
 	return ret
 }
 
+func CQCodeEscapeValue(value string) string {
+	ret := CQCodeEscapeText(value)
+	ret = strings.ReplaceAll(ret, ",", "&#44;")
+	return ret
+}
+
 func CQCodeUnescapeText(content string) string {
 	ret := content
 	ret = strings.ReplaceAll(ret, "&#91;", "[")
 	ret = strings.ReplaceAll(ret, "&#93;", "]")
 	ret = strings.ReplaceAll(ret, "&amp;", "&")
+	return ret
+}
+
+func CQCodeUnescapeValue(content string) string {
+	ret := strings.ReplaceAll(content, "&#44;", ",")
+	ret = CQCodeUnescapeText(ret)
 	return ret
 }
